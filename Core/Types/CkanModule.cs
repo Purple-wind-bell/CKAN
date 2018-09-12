@@ -401,7 +401,7 @@ namespace CKAN
                 );
             }
 
-            // Check everything in the spec if defined.
+            // Check everything in the spec is defined.
             // TODO: This *can* and *should* be done with JSON attributes!
 
             foreach (string field in required_fields)
@@ -539,14 +539,9 @@ namespace CKAN
         /// </summary>
         internal static bool UniConflicts(CkanModule mod1, CkanModule mod2)
         {
-            if (mod1.conflicts == null)
-            {
-                return false;
-            }
-            return
-                mod1.conflicts.Any(
-                    conflict =>
-                        mod2.ProvidesList.Contains(conflict.name) && conflict.WithinBounds(mod2.version));
+            return mod1?.conflicts?.Any(
+                conflict => conflict.MatchesAny(new CkanModule[] {mod2}, null, null)
+            ) ?? false;
         }
 
         /// <summary>
@@ -701,7 +696,8 @@ namespace CKAN
         public string DescribeInstallStanzas()
         {
             List<string> descriptions = new List<string>();
-            foreach (ModuleInstallDescriptor mid in install) {
+            foreach (ModuleInstallDescriptor mid in install)
+            {
                 descriptions.Add(mid.DescribeMatch());
             }
             return string.Join(", ", descriptions);
@@ -753,6 +749,7 @@ namespace CKAN
         private readonly string why;
 
         public InvalidModuleAttributesException(string why, CkanModule module = null)
+            : base(why)
         {
             this.why = why;
             this.module = module;

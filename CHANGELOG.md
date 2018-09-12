@@ -2,12 +2,73 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.24.1
+## v1.25.4
+
+## v1.25.3 (Woomera)
+
+### Features
+- [GUI] Replace New in repository filter with Newly compatible filter (#2494 by: HebaruSan; reviewed: Olympic1, politas)
+- [GUI] Add Install Date column to GUI mod list (#2514 by: HebaruSan; reviewed: politas)
+
+### Bugfixes
+
+- [Multiple] Fix crash when initializing CKAN dirs at argumentless GUI startup (#2482 by: HebaruSan; reviewed: politas)
+- [Core] Allow installing modules without `download_size` (#2491 by: HebaruSan)
+- [Multiple] Fix GUIMod crash when module doesn't have a compatible game version (#2486 by: HebaruSan; reviewed: cculianu, politas)
+- [Core] Fix crash on invalid portable or Steam folder (#2506 by: HebaruSan; reviewed: politas)
+- [GUI] Fix red X on HideTab (#2501 by: HebaruSan; reviewed: politas)
+- [Core] Set default Exception.Message string for ModuleNotFoundKraken (#2493 by: HebaruSan; reviewed: politas)
+- [Core] Fix missing CdFileMgr folder errors (#2492 by: HebaruSan; reviewed: politas)
+
+## v1.25.2 (Goddard)
+
+### Features
+
+- [GUI] Limit future Max KSP column values based on known versions (#2437 by: yalov; reviewed: politas)
+- [GUI] Add description to ModInfoTab (#2463 by: politas; reviewed: HebaruSan)
+
+### Bugfixes
+
+- [core] Ignore conflicts between versions of same mod (#2430 by: HebaruSan; reviewed: politas)
+- [GUI] Don't Force Apply button active when no update selected (#2429 by: DasSkelett; reviewed: politas)
+- [Core] Improve handling of missing game version (#2444 by: HebaruSan; reviewed: politas)
+- [Core] Handle zero byte registry.json file (#2435 by: HebaruSan; reviewed: politas)
+- [Multiple] Pass game instance from cmdline to GUI/ConsoleUI (#2449 by: HebaruSan; reviewed: politas)
+- [GUI] Show conflict messages in status bar (#2442 by: HebaruSan; reviewed: dbent, politas)
+- [GUI] Remove v in installed version and latest version columns (#2451 by yalov; reviewed: politas)
+- [Netkan] Support new Curse URLs (#2464 by: HebaruSan; reviewed: Olympic1, politas)
+- [Netkan] Fix Netkan error message when both `ksp_version` and min/max are present (#2480 by: HebaruSan; reviewed: politas)
+
+### Internal
+
+- [Core] Test upgrading mod with conflict on its own provides (#2431 by: HebaruSan; reviewed: politas)
+
+## v1.25.1 (Broglio)
+
+### Features
+
+- [GUI] Replace empty max KSP version string with "any" (#2420 by: DasSkellet; reviewed: HebaruSan, politas)
+
+### Bugfixes
+
+- [GUI] Splitter and tabstrip visual improvements (#2413 by: HebaruSan; reviewed: politas)
+- [GUI] Fix "Collection was modified" exception for redundant optional dependencies (#2423 by: HebaruSan; reviewed: politas)
+- [core] Treat installed DLC as compatible dependency (#2424 by: HebaruSan; reviewed: politas)
+- [GUI] Ignore splitter exceptions (#2426 by: HebaruSan; reviewed: politas)
+
+### Internal
+
+- [Build] Add more tests (#2410 by: HebaruSan, DasSkelett; reviewed: politas)
+- [Updater] AutoUpdate: tokens and tests (#2411 by: HebaruSan; reviewed: politas)
+
+## v1.25.0 (Wallops)
 
 ### Features
 
 - [Core] Detect DLC and allow as a dependency (#2326 by: dbent; reviewed: politas)
 - [GUI] Install old mod versions by version list double-click (#2364 by: HebaruSan; reviewed: politas)
+- [Core] Allow installations to the Missions folder (#2371 by: Olympic1; reviewed: politas)
+- [GUI] Sort by "update"-column on clicking "add available updates"-button (#2392 by: DasSkellet; reviewed: politas)
 
 ### Bugfixes
 
@@ -15,7 +76,7 @@ All notable changes to this project will be documented in this file.
 - [GUI] Handle mod not found in versions tab (#2303 by: HebaruSan; reviewed: politas)
 - [GUI] Better resizing for Select KSP Install window (#2306 by: HebaruSan; reviewed: politas)
 - [GUI] Fix GUI sort by size (#2311 by: HebaruSan; reviewed: politas)
-- [Core] Don't crash if download_hash isn't set (#2313 by: HebaruSan; reviewed: politas)
+- [Core] Don't crash if `download_hash` isn't set (#2313 by: HebaruSan; reviewed: politas)
 - [GUI] Fix GUI instance name checking (#2316 by: HebaruSan; reviewed: politas)
 - [Core] Fix ArgumentOutOfRangeException when removing files from game root (#2332 by: HebaruSan; reviewed: politas)
 - [Core] Obey version properties of conflicts and depends relationships in sanity checks (#2339 by: HebaruSan; reviewed: politas)
@@ -25,6 +86,15 @@ All notable changes to this project will be documented in this file.
 - [Core] Support CC-BY-ND licences in code (#2369 by: HebaruSan; no review)
 - [GUI] Improve response to checkbox changes (#2354 by: HebaruSan; reviewed: politas)
 - [Core] Allow downloader to be used multiple times (#2365 by: HebaruSan; reviewed: politas)
+- [GUI] Clean up URL Handler registration (#2366 by: HebaruSan; reviewed: politas)
+- [Multiple] Deal with threading and download errors (#2374 by: HebaruSan; reviewed: politas)
+- [GUI] More verbose and accurate version displays (#2382 by: HebaruSan; reviewed: politas)
+- [Core] Encode spaces in URL output (#2386 by: HebaruSan; reviewed: politas)
+- [Multiple] Clean-up and debuggability (#2399 by: HebaruSan; reviewed: politas)
+- [Netkan] Don't double encode GitHub download URLs (#2402 by: HebaruSan; reviewed: politas)
+- [Netkan] Option to override SpaceDock version with AVC version (#2406 by: HebaruSan; reviewed: politas)
+- [GUI] Move AutoUpdate.CanUpdate check to resolve VisualStudio Designer Error (#2407 by: DasSkelett; reviewed: Olympic1, politas)
+- [GUI] Better AutoUpdate.CanUpdate Error Message (#2408 by: DasSkelett; reviewed: politas)
 
 ### Internal
 

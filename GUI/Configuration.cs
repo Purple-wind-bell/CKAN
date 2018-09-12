@@ -15,9 +15,12 @@ namespace CKAN
         public bool CheckForUpdatesOnLaunchNoNag = false;
 
         public bool HideEpochs = true;
+        public bool HideV = false;
 
         public bool RefreshOnStartup = true; // Defaults to true, so everyone is forced to refresh on first start
         public bool RefreshOnStartupNoNag = false;
+
+        public bool AutoSortByUpdate = true;
 
         public int ActiveFilter = 0;
 
@@ -107,12 +110,12 @@ namespace CKAN
                 {
                     string additionalErrorData = "";
 
-                    if(e is System.InvalidOperationException) // Exception thrown in Windows / .NET
+                    if (e is System.InvalidOperationException) // Exception thrown in Windows / .NET
                     {
-                        if(e.InnerException != null)
+                        if (e.InnerException != null)
                             additionalErrorData = ": " + e.InnerException.Message;
                     }
-                    else if(e is System.Xml.XmlException) // Exception thrown in Mono
+                    else if (e is System.Xml.XmlException) // Exception thrown in Mono
                     {
                         additionalErrorData = ": " + e.Message;
                     }

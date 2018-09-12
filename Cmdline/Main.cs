@@ -40,9 +40,9 @@ namespace CKAN.CmdLine
                 Debugger.Launch();
             }
 
-            if (args.Length == 1 && args.Any(i => i == "--verbose" || i == "--debug"))
+            // Default to GUI if there are no command line args or if the only args are flags rather than commands.
+            if (args.All(a => a == "--verbose" || a == "--debug" || a == "--asroot" || a == "--show-console"))
             {
-                // Start the gui with logging enabled #437
                 var guiCommand = args.ToList();
                 guiCommand.Insert(0, "gui");
                 args = guiCommand.ToArray();
@@ -54,12 +54,6 @@ namespace CKAN.CmdLine
             // Force-allow TLS 1.2 for HTTPS URLs, because GitHub requires it.
             // This is on by default in .NET 4.6, but not in 4.5.
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-
-            // If we're starting with no options then invoke the GUI instead.
-            if (args.Length == 0)
-            {
-                return Gui(new GuiOptions(), args);
-            }
 
             try
             {
@@ -174,10 +168,10 @@ namespace CKAN.CmdLine
                 switch (cmdline.action)
                 {
                     case "gui":
-                        return Gui((GuiOptions)options, args);
+                        return Gui(manager, (GuiOptions)options, args);
 
                     case "consoleui":
-                        return ConsoleUi(options, args);
+                        return ConsoleUi(manager, options, args);
 
                     case "prompt":
                         return new Prompt().RunCommand(manager, cmdline.options);
@@ -243,21 +237,21 @@ namespace CKAN.CmdLine
             return Exit.ERROR;
         }
 
-        private static int Gui(GuiOptions options, string[] args)
+        private static int Gui(KSPManager manager, GuiOptions options, string[] args)
         {
             // TODO: Sometimes when the GUI exits, we get a System.ArgumentException,
             // but trying to catch it here doesn't seem to help. Dunno why.
 
-            GUI.Main_(args, options.ShowConsole);
+            GUI.Main_(args, manager, options.ShowConsole);
 
             return Exit.OK;
         }
 
-        private static int ConsoleUi(CommonOptions opts, string[] args)
+        private static int ConsoleUi(KSPManager manager, CommonOptions opts, string[] args)
         {
             // Debug/verbose output just messes up the screen
             LogManager.GetRepository().Threshold = Level.Warn;
-            return CKAN.ConsoleUI.ConsoleUI.Main_(args, opts.Debug);
+            return CKAN.ConsoleUI.ConsoleUI.Main_(args, manager, opts.Debug);
         }
 
         private static int Version(IUser user)

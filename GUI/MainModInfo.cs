@@ -69,7 +69,15 @@ namespace CKAN
             }
             set
             {
-                this.splitContainer2.SplitterDistance = value;
+                try
+                {
+                    this.splitContainer2.SplitterDistance = value;
+                }
+                catch
+                {
+                    // SplitContainer is mis-designed to throw exceptions
+                    // if the min/max limits are exceeded rather than simply obeying them.
+                }
             }
         }
 
@@ -133,7 +141,8 @@ namespace CKAN
             Util.Invoke(MetadataModuleVersionLabel, () => MetadataModuleVersionLabel.Text = gui_module.LatestVersion.ToString());
             Util.Invoke(MetadataModuleLicenseLabel, () => MetadataModuleLicenseLabel.Text = string.Join(", ", module.license));
             Util.Invoke(MetadataModuleAuthorLabel, () => MetadataModuleAuthorLabel.Text = gui_module.Authors);
-            Util.Invoke(MetadataModuleAbstractLabel, () => MetadataModuleAbstractLabel.Text = module.@abstract);
+            Util.Invoke (MetadataModuleAbstractLabel, () => MetadataModuleAbstractLabel.Text = module.@abstract);
+            Util.Invoke (MetadataModuleDescriptionLabel, () => MetadataModuleDescriptionLabel.Text = module.description);
             Util.Invoke(MetadataIdentifierLabel, () => MetadataIdentifierLabel.Text = module.identifier);
 
             // If we have a homepage provided, use that; otherwise use the spacedock page, curse page or the github repo so that users have somewhere to get more info than just the abstract.
@@ -302,6 +311,13 @@ namespace CKAN
             }
             catch (ModuleNotFoundKraken)
             {
+                // Maybe it's a DLC?
+                ModuleVersion installedVersion = registry.InstalledVersion(identifier, false);
+                if (installedVersion != null)
+                {
+                    return nonModuleNode(identifier, installedVersion, relationship);
+                }
+
                 // If we don't find a module by this name, look for other modules that provide it.
                 List<CkanModule> dependencyModules = registry.LatestAvailableWithProvides(identifier, crit);
                 if (dependencyModules != null && dependencyModules.Count > 0)
@@ -339,6 +355,16 @@ namespace CKAN
                 ToolTipText = relationship.ToString(),
                 Tag         = module,
                 ForeColor   = compatible ? Color.Empty : Color.Red
+            };
+        }
+
+        private TreeNode nonModuleNode(string identifier, ModuleVersion version, RelationshipType relationship)
+        {
+            int icon = (int)relationship + 1;
+            return new TreeNode($"{identifier} {version}", icon, icon)
+            {
+                Name        = identifier,
+                ToolTipText = relationship.ToString()
             };
         }
 
@@ -442,7 +468,7 @@ namespace CKAN
         {
             Main.Instance.HideWaitDialog(true);
 
-            SelectedModule?.UpdateIsCached(); ;
+            SelectedModule?.UpdateIsCached();
             UpdateModContentsTree(module, true);
             Main.Instance.RecreateDialogs();
         }
@@ -450,7 +476,7 @@ namespace CKAN
         /// <summary>
         /// Opens the file browser of the users system
         /// with the folder of the clicked node opened
-        /// TODO: Open a file broweser with the file selected
+        /// TODO: Open a file browser with the file selected
         /// </summary>
         /// <param name="node">A node of the ContentsPreviewTree</param>
         internal void OpenFileBrowser(TreeNode node)

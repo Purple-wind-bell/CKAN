@@ -59,12 +59,17 @@ namespace CKAN
         public string version;
 
         // TODO: Is there a way to set the stringify version of this?
-        public ModuleNotFoundKraken(string module, string version = null, string reason = null, Exception innerException = null)
+        public ModuleNotFoundKraken(string module, string version, string reason, Exception innerException = null)
             : base(reason, innerException)
         {
-            this.module = module;
+            this.module  = module;
             this.version = version;
         }
+
+        public ModuleNotFoundKraken(string module, string version = null)
+            : this(module, version, $"Module not found: {module} {version ?? ""}")
+        { }
+
     }
 
     /// <summary>
@@ -175,6 +180,14 @@ namespace CKAN
             }
         }
 
+        public string ShortDescription
+        {
+            get
+            {
+                return String.Join("; ", inconsistencies);
+            }
+        }
+
         public InconsistentKraken(ICollection<string> inconsistencies, Exception innerException = null)
             : base(null, innerException)
         {
@@ -193,6 +206,33 @@ namespace CKAN
         }
 
         private const string header = "The following inconsistencies were found:\r\n";
+    }
+
+    /// <summary>
+    /// A mutation of InconsistentKraken that allows catching code to extract the causes of the errors.
+    /// </summary>
+    public class BadRelationshipsKraken : InconsistentKraken
+    {
+        public BadRelationshipsKraken(
+            ICollection<KeyValuePair<CkanModule, RelationshipDescriptor>> depends,
+            ICollection<KeyValuePair<CkanModule, RelationshipDescriptor>> conflicts
+        ) : base(
+            (depends?.Select(dep => $"{dep.Key} missing dependency {dep.Value}")
+                ?? new string[] {}
+            ).Concat(
+                conflicts?.Select(conf => $"{conf.Key} conflicts with {conf.Value}")
+                ?? new string[] {}
+            ).ToArray()
+        )
+        {
+            Depends   = depends?.ToList()
+                ?? new List<KeyValuePair<CkanModule, RelationshipDescriptor>>();
+            Conflicts = conflicts?.ToList()
+                ?? new List<KeyValuePair<CkanModule, RelationshipDescriptor>>();
+        }
+
+        public List<KeyValuePair<CkanModule, RelationshipDescriptor>> Depends   { get; private set; }
+        public List<KeyValuePair<CkanModule, RelationshipDescriptor>> Conflicts { get; private set; }
     }
 
     /// <summary>

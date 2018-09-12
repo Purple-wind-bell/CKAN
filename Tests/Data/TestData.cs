@@ -509,9 +509,47 @@ namespace Tests.Data
             ;
         }
 
+        public static string kOS_014_epoch()
+        {
+            return @"
+                {
+                    ""spec_version"": 1,
+                    ""name""     : ""kOS - Kerbal OS"",
+                    ""identifier"" : ""kOS"",
+                    ""abstract"" : ""A programming and automation environment for KSP craft."",
+                    ""download"" : ""https://github.com/KSP-KOS/KOS/releases/download/v0.14/kOS.v14.zip"",
+                    ""license""  : ""GPL-3.0"",
+                    ""version""  : ""3:0.14"",
+                    ""release_status"" : ""stable"",
+                    ""ksp_version"" : ""0.24.2"",
+                    ""resources"" : {
+                        ""homepage"" : ""http://forum.kerbalspaceprogram.com/threads/68089-0-23-kOS-Scriptable-Autopilot-System-v0-11-2-13"",
+                        ""manual""   : ""http://ksp-kos.github.io/KOS_DOC/"",
+                        ""bugtracker"": ""https://github.com/KSP-KOS/KOS/issues"",
+                        ""repository""   : ""https://github.com/KSP-KOS/KOS""
+                    },
+                    ""install"" : [
+                        {
+                            ""file""       : ""GameData/kOS"",
+                            ""install_to"" : ""GameData""
+                        }
+                    ],
+                    ""download_hash"": {
+                        ""sha1"": ""C5A224AC4397770C0B19B4A6417F6C5052191608"",
+                        ""sha256"": ""E0FB79C81D8FCDA8DB6E38B104106C3B7D078FDC06ACA2BC7834973B43D789CB""
+                    }
+                }"
+            ;
+        }
+
         public static CkanModule kOS_014_module()
         {
             return CkanModule.FromJson(kOS_014());
+        }
+
+        public static CkanModule kOS_014_epoch_module()
+        {
+            return CkanModule.FromJson(kOS_014_epoch());
         }
 
         public static string KS_CustomAsteroids_string()
@@ -543,6 +581,16 @@ namespace Tests.Data
         public static string ModuleManagerZip()
         {
             return DataDir("ModuleManager-2.5.1.zip");
+        }
+
+        public static CkanModule MissionModule()
+        {
+            return CkanModule.FromFile(DataDir("MissionTest-1.0.ckan"));
+        }
+
+        public static string MissionZip()
+        {
+            return DataDir("MissionTest-1.0.zip");
         }
 
         /// <summary>
@@ -591,6 +639,7 @@ namespace Tests.Data
               <CheckForUpdatesOnLaunch>true</CheckForUpdatesOnLaunch>
               <CheckForUpdatesOnLaunchNoNag>true</CheckForUpdatesOnLaunchNoNag>
               <HideEpochs>true</HideEpochs>
+              <HideV>false</HideV>
               <SortByColumnIndex>2</SortByColumnIndex>
               <SortDescending>false</SortDescending>
               <WindowSize>
@@ -618,7 +667,7 @@ namespace Tests.Data
             KspVersion ksp_version = null,
             List<RelationshipDescriptor> conflicts = null,
             List<RelationshipDescriptor> depends = null,
-            List<RelationshipDescriptor> sugests = null,
+            List<RelationshipDescriptor> suggests = null,
             List<String> provides = null,
             string identifier = null,
             ModuleVersion version = null)
@@ -635,7 +684,7 @@ namespace Tests.Data
             mod.ksp_version_max = mod.ksp_version_min = null;
             mod.conflicts = conflicts;
             mod.depends = depends;
-            mod.suggests = sugests;
+            mod.suggests = suggests;
             mod.provides = provides;
             return mod;
         }

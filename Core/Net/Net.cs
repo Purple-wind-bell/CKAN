@@ -20,8 +20,7 @@ namespace CKAN
         // The user agent that we report to web sites
         public static string UserAgentString = "Mozilla/4.0 (compatible; CKAN)";
 
-        private static readonly ILog Log = LogManager.GetLogger(typeof (Net));
-        private static readonly TxFileManager FileTransaction = new TxFileManager();
+        private static readonly ILog          log             = LogManager.GetLogger(typeof(Net));
 
         public static readonly Dictionary<string, Uri> ThrottledHosts = new Dictionary<string, Uri>()
         {
@@ -32,12 +31,12 @@ namespace CKAN
         };
 
         /// <summary>
-        ///     Downloads the specified url, and stores it in the filename given.
-        ///     If no filename is supplied, a temporary file will be generated.
-        ///     Returns the filename the file was saved to on success.
-        ///     Throws an exception on failure.
-        ///     Throws a MissingCertificateException *and* prints a message to the
-        ///     console if we detect missing certificates (common on a fresh Linux/mono install)
+        /// Downloads the specified url, and stores it in the filename given.
+        /// If no filename is supplied, a temporary file will be generated.
+        /// Returns the filename the file was saved to on success.
+        /// Throws an exception on failure.
+        /// Throws a MissingCertificateException *and* prints a message to the
+        /// console if we detect missing certificates (common on a fresh Linux/mono install)
         /// </summary>
         public static string Download(Uri url, string filename = null, IUser user = null)
         {
@@ -46,6 +45,8 @@ namespace CKAN
 
         public static string Download(string url, string filename = null, IUser user = null)
         {
+            TxFileManager FileTransaction = new TxFileManager();
+
             user = user ?? new NullUser();
             user.RaiseMessage("Downloading {0}", url);
 
@@ -55,17 +56,16 @@ namespace CKAN
                 filename = FileTransaction.GetTempFileName();
             }
 
-            Log.DebugFormat("Downloading {0} to {1}", url, filename);
-
-            var agent = MakeDefaultHttpClient();
+            log.DebugFormat("Downloading {0} to {1}", url, filename);
 
             try
             {
+                var agent = MakeDefaultHttpClient();
                 agent.DownloadFile(url, filename);
             }
             catch (Exception ex)
             {
-                Log.InfoFormat("Download failed, trying with curlsharp...");
+                log.InfoFormat("Download failed, trying with curlsharp...");
 
                 try
                 {
@@ -81,7 +81,7 @@ namespace CKAN
                         }
                         else
                         {
-                            Log.Debug("curlsharp download successful");
+                            log.Debug("curlsharp download successful");
                         }
                     }
 
@@ -98,7 +98,7 @@ namespace CKAN
                 // It's okay if this fails.
                 try
                 {
-                    Log.DebugFormat("Removing {0} after web error failure", filename);
+                    log.DebugFormat("Removing {0} after web error failure", filename);
                     FileTransaction.Delete(filename);
                 }
                 catch
@@ -129,6 +129,8 @@ namespace CKAN
 
             public DownloadTarget(Uri url, Uri fallback = null, string filename = null, long size = 0, string mimeType = "")
             {
+                TxFileManager FileTransaction = new TxFileManager();
+
                 this.url         = url;
                 this.fallbackUrl = fallback;
                 this.filename    = string.IsNullOrEmpty(filename)
@@ -146,7 +148,9 @@ namespace CKAN
 
         public static string DownloadWithProgress(Uri url, string filename = null, IUser user = null)
         {
-            var targets = new[] {new DownloadTarget(url, null, filename)};
+            var targets = new[] {
+                new DownloadTarget(url, null, filename)
+            };
             DownloadWithProgress(targets, user);
             return targets.First().filename;
         }
@@ -168,28 +172,33 @@ namespace CKAN
 
         public static string DownloadText(Uri url)
         {
-            return DownloadText(url.OriginalString);
-        }
-
-        public static string DownloadText(string url)
-        {
-            Log.DebugFormat("About to download {0}", url);
-
-            var agent = MakeDefaultHttpClient();
+            log.DebugFormat("About to download {0}", url.OriginalString);
 
             try
             {
-                return agent.DownloadString(url);
+                WebClient agent = MakeDefaultHttpClient();
+
+                // Check whether to use an auth token for this host
+                string token;
+                if (Win32Registry.TryGetAuthToken(url.Host, out token)
+                        && !string.IsNullOrEmpty(token))
+                {
+                    log.InfoFormat("Using auth token for {0}", url.Host);
+                    // Send our auth token to the GitHub API (or whoever else needs one)
+                    agent.Headers.Add("Authorization", $"token {token}");
+                }
+
+                return agent.DownloadString(url.OriginalString);
             }
             catch (Exception)
             {
                 try
                 {
-                    Log.InfoFormat("Download failed, trying with curlsharp...");
+                    log.InfoFormat("Download failed, trying with curlsharp...");
 
                     var content = string.Empty;
 
-                    var client = Curl.CreateEasy(url, delegate (byte[] buf, int size, int nmemb, object extraData)
+                    var client = Curl.CreateEasy(url.OriginalString, delegate (byte[] buf, int size, int nmemb, object extraData)
                     {
                         content += Encoding.UTF8.GetString(buf);
                         return size * nmemb;
@@ -204,12 +213,12 @@ namespace CKAN
                             throw new Exception("Curl download failed with error " + result);
                         }
 
-                        Log.DebugFormat("Download from {0}:\r\n\r\n{1}", url, content);
+                        log.DebugFormat("Download from {0}:\r\n\r\n{1}", url, content);
 
                         return content;
                     }
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     throw new Kraken("Downloading using cURL failed", e);
                 }
@@ -238,7 +247,7 @@ namespace CKAN
                 }
                 else
                 {
-                    Log.InfoFormat("{0} redirected to {1}", currentUri, location);
+                    log.InfoFormat("{0} redirected to {1}", currentUri, location);
 
                     if (Uri.IsWellFormedUriString(location, UriKind.Absolute))
                     {
@@ -247,7 +256,7 @@ namespace CKAN
                     else if (Uri.IsWellFormedUriString(location, UriKind.Relative))
                     {
                         currentUri = new Uri(currentUri, location);
-                        Log.DebugFormat("Relative URL {0} is absolute URL {1}", location, currentUri);
+                        log.DebugFormat("Relative URL {0} is absolute URL {1}", location, currentUri);
                     }
                     else
                     {
@@ -263,7 +272,6 @@ namespace CKAN
         {
             var client = new WebClient();
             client.Headers.Add("User-Agent", UserAgentString);
-
             return client;
         }
 

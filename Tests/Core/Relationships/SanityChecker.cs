@@ -128,11 +128,11 @@ namespace Tests.Core.Relationships
         [Test]
         public void ReverseDepends()
         {
-            var mods = new List<CkanModule>
+            var mods = new List<CkanModule>()
             {
-                registry.LatestAvailable("CustomBiomes",null),
-                registry.LatestAvailable("CustomBiomesKerbal",null),
-                registry.LatestAvailable("DogeCoinFlag",null)
+                registry.LatestAvailable("CustomBiomes",       null),
+                registry.LatestAvailable("CustomBiomesKerbal", null),
+                registry.LatestAvailable("DogeCoinFlag",       null)
             };
 
             // Make sure some of our expectations regarding dependencies are correct.
@@ -162,7 +162,168 @@ namespace Tests.Core.Relationships
             expected.Clear();
             to_remove.Clear();
             TestDepends(to_remove, mods, null, null, expected, "Removing nothing");
+        }
 
+        [Test]
+        public void IsConsistent_MismatchedDependencyVersion_Inconsistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""depender"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""depends"": [ {
+                        ""name"":    ""dependency"",
+                        ""version"": ""1.2.3""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""dependency"",
+                    ""version"":    ""1.1.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01""
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsFalse(CKAN.SanityChecker.IsConsistent(modules));
+        }
+
+        [Test]
+        public void IsConsistent_MatchedDependencyVersion_Consistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""depender"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""depends"": [ {
+                        ""name"":    ""dependency"",
+                        ""version"": ""1.2.3""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""dependency"",
+                    ""version"":    ""1.2.3"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01""
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsTrue(CKAN.SanityChecker.IsConsistent(modules));
+        }
+
+        [Test]
+        public void IsConsistent_MismatchedConflictVersion_Consistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""depender"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""conflicts"": [ {
+                        ""name"":    ""dependency"",
+                        ""version"": ""1.2.3""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""dependency"",
+                    ""version"":    ""1.1.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01""
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsTrue(CKAN.SanityChecker.IsConsistent(modules));
+        }
+
+        [Test]
+        public void IsConsistent_MatchedConflictVersion_Inconsistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""depender"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""conflicts"": [ {
+                        ""name"":    ""dependency"",
+                        ""version"": ""1.2.3""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""dependency"",
+                    ""version"":    ""1.2.3"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01""
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsFalse(CKAN.SanityChecker.IsConsistent(modules));
+        }
+
+        [Test]
+        public void IsConsistent_MultipleVersionsOfSelfConflictingModule_Consistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""self-conflictor"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""conflicts"": [ {
+                        ""name"":    ""self-conflictor""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""self-conflictor"",
+                    ""version"":    ""1.2.3"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""conflicts"": [ {
+                        ""name"":    ""self-conflictor""
+                    } ]
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsTrue(CKAN.SanityChecker.IsConsistent(modules));
+        }
+
+        [Test]
+        public void IsConsistent_MultipleVersionsOfSelfProvidesConflictingModule_Consistent()
+        {
+            // Arrange
+            List<CkanModule> modules = new List<CkanModule>()
+            {
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""provides-conflictor"",
+                    ""version"":    ""1.0.0"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""provides"":   [ ""providee"" ],
+                    ""conflicts"": [ {
+                        ""name"":    ""providee""
+                    } ]
+                }"),
+                CkanModule.FromJson(@"{
+                    ""identifier"": ""provides-conflictor"",
+                    ""version"":    ""1.2.3"",
+                    ""download"":   ""https://kerbalstuff.com/mod/269/Dogecoin%20Flag/download/1.01"",
+                    ""provides"":   [ ""providee"" ],
+                    ""conflicts"": [ {
+                        ""name"":    ""providee""
+                    } ]
+                }")
+            };
+
+            // Act & Assert
+            Assert.IsTrue(CKAN.SanityChecker.IsConsistent(modules));
         }
 
         private static void TestDepends(
@@ -189,5 +350,6 @@ namespace Tests.Core.Relationships
             // Check our actual results.
             CollectionAssert.AreEquivalent(expected, results, message);
         }
+
     }
 }

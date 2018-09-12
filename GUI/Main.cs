@@ -108,14 +108,18 @@ namespace CKAN
 
         private void ConflictsUpdated()
         {
+            if (Conflicts == null) {
+                // Clear status bar if no conflicts
+                AddStatusMessage("");
+            }
             foreach (DataGridViewRow row in ModList.Rows)
             {
-                var module = (GUIMod)row.Tag;
+                GUIMod module = (GUIMod)row.Tag;
                 string value;
 
                 if (Conflicts != null && Conflicts.TryGetValue(module, out value))
                 {
-                    var conflict_text = value;
+                    string conflict_text = value;
                     foreach (DataGridViewCell cell in row.Cells)
                     {
                         cell.ToolTipText = conflict_text;
@@ -127,18 +131,15 @@ namespace CKAN
                         ModList.InvalidateRow(row.Index);
                     }
                 }
-                else
+                else if (row.DefaultCellStyle.BackColor != Color.Empty)
                 {
-                    if (row.DefaultCellStyle.BackColor != Color.Empty)
+                    foreach (DataGridViewCell cell in row.Cells)
                     {
-                        foreach (DataGridViewCell cell in row.Cells)
-                        {
-                            cell.ToolTipText = null;
-                        }
-
-                        row.DefaultCellStyle.BackColor = Color.Empty;
-                        ModList.InvalidateRow(row.Index);
+                        cell.ToolTipText = null;
                     }
+
+                    row.DefaultCellStyle.BackColor = Color.Empty;
+                    ModList.InvalidateRow(row.Index);
                 }
             }
         }
@@ -158,14 +159,17 @@ namespace CKAN
             }
         }
 
-        public Main(string[] cmdlineArgs, GUIUser user, bool showConsole)
+        public Main(string[] cmdlineArgs, KSPManager mgr, GUIUser user, bool showConsole)
         {
             log.Info("Starting the GUI");
             commandLineArgs = cmdlineArgs;
-            currentUser = user;
 
+            // These are used by KSPManager's constructor to show messages about directory creation
             user.displayMessage = AddStatusMessage;
-            user.displayError = ErrorDialog;
+            user.displayError   = ErrorDialog;
+
+            manager = mgr ?? new KSPManager(user);
+            currentUser = user;
 
             controlFactory = new ControlFactory();
             Instance = this;
@@ -182,7 +186,6 @@ namespace CKAN
 
             // We want to check if our current instance is null first,
             // as it may have already been set by a command-line option.
-            Manager = new KSPManager(user);
             if (CurrentInstance == null && manager.GetPreferredInstance() == null)
             {
                 Hide();
@@ -198,7 +201,7 @@ namespace CKAN
             configuration = Configuration.LoadOrCreateConfiguration
                 (
                     Path.Combine(CurrentInstance.CkanDir(), "GUIConfig.xml"),
-                    Repo.default_ckan_repo.ToString()
+                    CKAN.Repository.default_ckan_repo_uri.ToString()
                 );
 
             // Check if there is any other instances already running.
@@ -280,7 +283,15 @@ namespace CKAN
             Location = configuration.WindowLoc;
             Size = configuration.WindowSize;
             WindowState = configuration.IsWindowMaximised ? FormWindowState.Maximized : FormWindowState.Normal;
-            splitContainer1.SplitterDistance = configuration.PanelPosition;
+            try
+            {
+                splitContainer1.SplitterDistance = configuration.PanelPosition;
+            }
+            catch
+            {
+                // SplitContainer is mis-designed to throw exceptions
+                // if the min/max limits are exceeded rather than simply obeying them.
+            }
             ModInfoTabControl.ModMetaSplitPosition = configuration.ModInfoPosition;
 
             if (!configuration.CheckForUpdatesOnLaunchNoNag && AutoUpdate.CanUpdate)
@@ -301,13 +312,13 @@ namespace CKAN
                 {
                     log.Info("Making auto-update call");
                     AutoUpdate.Instance.FetchLatestReleaseInfo();
-                    var latest_version = AutoUpdate.Instance.LatestVersion;
+                    var latest_version = AutoUpdate.Instance.latestUpdate.Version;
                     var current_version = new ModuleVersion(Meta.GetVersion());
 
                     if (AutoUpdate.Instance.IsFetched() && latest_version.IsGreaterThan(current_version))
                     {
                         log.Debug("Found higher ckan version");
-                        var release_notes = AutoUpdate.Instance.ReleaseNotes;
+                        var release_notes = AutoUpdate.Instance.latestUpdate.ReleaseNotes;
                         var dialog = new NewUpdateDialog(latest_version.ToString(), release_notes);
                         if (dialog.ShowDialog() == DialogResult.OK)
                         {
@@ -428,7 +439,7 @@ namespace CKAN
             configuration = Configuration.LoadOrCreateConfiguration
             (
                 Path.Combine(CurrentInstance.CkanDir(), "GUIConfig.xml"),
-                Repo.default_ckan_repo.ToString()
+                CKAN.Repository.default_ckan_repo_uri.ToString()
             );
 
             if (CurrentInstance.CompatibleVersionsAreFromDifferentKsp)
@@ -451,7 +462,7 @@ namespace CKAN
             SwitchEnabledState();
             ClearLog();
             tabController.RenameTab("WaitTabPage", "Updating CKAN");
-            SetDescription($"Upgrading CKAN to {AutoUpdate.Instance.LatestVersion}");
+            SetDescription($"Upgrading CKAN to {AutoUpdate.Instance.latestUpdate.Version}");
 
             log.Info("Start ckan update");
             BackgroundWorker updateWorker = new BackgroundWorker();
@@ -469,12 +480,28 @@ namespace CKAN
             foreach (DataGridViewRow row in ModList.Rows)
             {
                 var mod = (GUIMod)row.Tag;
-                if (mod.HasUpdate && row.Cells[1] is DataGridViewCheckBoxCell)
+                if (mod.HasUpdate)
                 {
                     MarkModForUpdate(mod.Identifier);
-                    mod.SetUpgradeChecked(row, true);
-                    ApplyToolButton.Enabled = true;
                 }
+            }
+
+            // only sort by Update column if checkbox in settings checked
+            if (Main.Instance.configuration.AutoSortByUpdate)
+            {
+                // set new sort column
+                var new_sort_column = ModList.Columns[1];
+                var current_sort_column = ModList.Columns[configuration.SortByColumnIndex];
+
+                // Reset the glyph.
+                current_sort_column.HeaderCell.SortGlyphDirection = SortOrder.None;
+                configuration.SortByColumnIndex = new_sort_column.Index;
+                UpdateFilters(this);
+
+                // Selects the top row and scrolls the list to it.
+                DataGridViewCell cell = ModList.Rows[0].Cells[2];
+                ModList.CurrentCell = cell;
+
             }
 
             ModList.Refresh();
@@ -573,9 +600,10 @@ namespace CKAN
                 var module_installer = ModuleInstaller.GetInstance(CurrentInstance, GUI.user);
                 full_change_set = await mainModList.ComputeChangeSetFromModList(registry, user_change_set, module_installer, CurrentInstance.VersionCriteria());
             }
-            catch (InconsistentKraken)
+            catch (InconsistentKraken k)
             {
                 // Need to be recomputed due to ComputeChangeSetFromModList possibly changing it with too many provides handling.
+                AddStatusMessage(k.ShortDescription);
                 user_change_set = mainModList.ComputeUserChangeSet();
                 new_conflicts = MainModList.ComputeConflictsFromModList(registry, user_change_set, CurrentInstance.VersionCriteria());
                 full_change_set = null;
@@ -585,6 +613,17 @@ namespace CKAN
                 // Can be thrown by ComputeChangeSetFromModList if the user cancels out of it.
                 // We can just rerun it as the ModInfoTabControl has been removed.
                 too_many_provides_thrown = true;
+            }
+            catch (DependencyNotSatisfiedKraken k)
+            {
+                GUI.user.RaiseError(
+                    "{0} depends on {1}, which is not compatible with the currently installed version of KSP",
+                    k.parent,
+                    k.module
+                );
+
+                // Uncheck the box
+                MarkModForInstall(k.parent.identifier, true);
             }
 
             if (too_many_provides_thrown)
@@ -722,7 +761,7 @@ namespace CKAN
             Enabled = true;
         }
 
-        private async void installFromckanToolStripMenuItem_Click(object sender, EventArgs e)
+        private void installFromckanToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog open_file_dialog = new OpenFileDialog { Filter = Resources.CKANFileFilter };
 

@@ -74,6 +74,7 @@
             this.LatestVersion = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.KSPCompatibility = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.SizeCol = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.InstallDate = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Description = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ModListContextMenuStrip = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.reinstallToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -397,7 +398,7 @@
             // 
             this.FilterNewButton.Name = "FilterNewButton";
             this.FilterNewButton.Size = new System.Drawing.Size(307, 30);
-            this.FilterNewButton.Text = "New in repository";
+            this.FilterNewButton.Text = "Newly compatible";
             this.FilterNewButton.Click += new System.EventHandler(this.FilterNewButton_Click);
             // 
             // FilterNotInstalledButton
@@ -453,12 +454,14 @@
             // 
             this.splitContainer1.Panel1.Controls.Add(this.ModList);
             // 
+            this.splitContainer1.Panel1MinSize = 200;
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.ModInfoTabControl);
+            this.splitContainer1.Panel2MinSize = 300;
             this.splitContainer1.Size = new System.Drawing.Size(1522, 836);
             this.splitContainer1.SplitterDistance = 1156;
-            this.splitContainer1.SplitterWidth = 6;
+            this.splitContainer1.SplitterWidth = 10;
             this.splitContainer1.TabIndex = 7;
             // 
             // ModList
@@ -479,6 +482,7 @@
             this.LatestVersion,
             this.KSPCompatibility,
             this.SizeCol,
+            this.InstallDate,
             this.Description});
             this.ModList.ContextMenuStrip = this.ModListContextMenuStrip;
             this.ModList.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -559,6 +563,14 @@
             this.SizeCol.ReadOnly = true;
             this.SizeCol.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
             // 
+            // InstallDate
+            //
+            this.InstallDate.HeaderText = "Install Date";
+            this.InstallDate.Name = "InstallDate";
+            this.InstallDate.ReadOnly = true;
+            this.InstallDate.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Programmatic;
+            this.InstallDate.Width = 140;
+            //
             // Description
             // 
             this.Description.HeaderText = "Description";
@@ -615,6 +627,7 @@
             this.StatusProgress.Maximum = 100;
             this.StatusProgress.Size = new System.Drawing.Size(300, 20);
             this.StatusProgress.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            //
             // MainTabControl
             // 
             this.MainTabControl.Controls.Add(this.ManageModsTabPage);
@@ -1144,6 +1157,7 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn LatestVersion;
         private System.Windows.Forms.DataGridViewTextBoxColumn KSPCompatibility;
         private System.Windows.Forms.DataGridViewTextBoxColumn SizeCol;
+        private System.Windows.Forms.DataGridViewTextBoxColumn InstallDate;
         private System.Windows.Forms.DataGridViewTextBoxColumn Description;
         private System.Windows.Forms.ContextMenuStrip ModListContextMenuStrip;
         private System.Windows.Forms.ToolStripMenuItem reinstallToolStripMenuItem;

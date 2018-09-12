@@ -21,10 +21,6 @@ namespace CKAN
     public static class Repo
     {
         private static readonly ILog log = LogManager.GetLogger(typeof (Repo));
-        private static TxFileManager file_transaction = new TxFileManager();
-
-        // Forward to keep existing code compiling, will be removed soon.
-        public static readonly Uri default_ckan_repo = CKAN.Repository.default_ckan_repo_uri;
 
         /// <summary>
         /// Download and update the local CKAN meta-info.
@@ -82,6 +78,8 @@ namespace CKAN
         /// </summary>
         private static List<CkanModule> UpdateRegistry(Uri repo, KSP ksp, IUser user)
         {
+            TxFileManager file_transaction = new TxFileManager();
+
             // Use this opportunity to also update the build mappings... kind of hacky
             ServiceLocator.Container.Resolve<IKspBuildMap>().Refresh();
 
@@ -92,9 +90,9 @@ namespace CKAN
             {
                 repo_file = Net.Download(repo);
             }
-            catch (System.Net.WebException)
+            catch (System.Net.WebException ex)
             {
-                user.RaiseMessage("Connection to {0} could not be established.", repo);
+                user.RaiseMessage("Failed to download {0}: {1}", repo, ex.ToString());
                 return null;
             }
 
@@ -301,7 +299,7 @@ Do you wish to reinstall now?", sb)))
             var aSorted = a.OrderBy(i => i.name).ToList();
             var bSorted = b.OrderBy(i => i.name).ToList();
 
-            for(var i = 0; i < a.Count; i++)
+            for (var i = 0; i < a.Count; i++)
             {
                 var aRel = aSorted[i];
                 var bRel = bSorted[i];
@@ -386,7 +384,7 @@ Do you wish to reinstall now?", sb)))
             // Use our default repo, unless we've been told otherwise.
             if (repo == null)
             {
-                repo = default_ckan_repo;
+                repo = CKAN.Repository.default_ckan_repo_uri;
             }
 
             List<CkanModule> newAvail = UpdateRegistry(repo, ksp, user);

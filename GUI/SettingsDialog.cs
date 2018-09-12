@@ -38,6 +38,10 @@ namespace CKAN
             CheckUpdateOnLaunchCheckbox.Checked = Main.Instance.configuration.CheckForUpdatesOnLaunch;
             RefreshOnStartupCheckbox.Checked = Main.Instance.configuration.RefreshOnStartup;
             HideEpochsCheckbox.Checked = Main.Instance.configuration.HideEpochs;
+            HideVCheckbox.Checked = Main.Instance.configuration.HideV;
+            AutoSortUpdateCheckBox.Checked = Main.Instance.configuration.AutoSortByUpdate;
+
+
 
             UpdateCacheInfo();
         }
@@ -376,7 +380,7 @@ namespace CKAN
             try
             {
                 AutoUpdate.Instance.FetchLatestReleaseInfo();
-                var latestVersion = AutoUpdate.Instance.LatestVersion;
+                var latestVersion = AutoUpdate.Instance.latestUpdate.Version;
                 if (latestVersion.IsGreaterThan(new ModuleVersion(Meta.GetVersion(VersionFormat.Short))) && AutoUpdate.Instance.IsFetched())
                 {
                     InstallUpdateButton.Enabled = true;
@@ -396,8 +400,16 @@ namespace CKAN
 
         private void InstallUpdateButton_Click(object sender, EventArgs e)
         {
-            Hide();
-            Main.Instance.UpdateCKAN();
+            if (AutoUpdate.CanUpdate)
+            {
+                Hide();
+                Main.Instance.UpdateCKAN();
+            }
+            else
+            {
+                GUI.user.RaiseError("Error during update.\r\nCan't update automatically, because ckan.exe is read-only or we are not allowed to overwrite it. Please update manually via https://github.com/KSP-CKAN/CKAN/releases/latest.");
+            }
+
         }
 
         private void CheckUpdateOnLaunchCheckbox_CheckedChanged(object sender, EventArgs e)
@@ -417,5 +429,19 @@ namespace CKAN
             Main.Instance.configuration.HideEpochs = HideEpochsCheckbox.Checked;
             Main.Instance.configuration.Save();
         }
+
+        private void HideVCheckbox_CheckedChanged(object sender, EventArgs e)
+        {
+            Main.Instance.configuration.HideV = HideVCheckbox.Checked;
+            Main.Instance.configuration.Save();
+        }
+
+        private void AutoSortUpdateCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            Main.Instance.configuration.AutoSortByUpdate = AutoSortUpdateCheckBox.Checked;
+            Main.Instance.configuration.Save();
+        }
+
+
     }
 }

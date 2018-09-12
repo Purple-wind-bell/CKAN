@@ -21,14 +21,12 @@ namespace CKAN
 
         private IEnumerable<DataGridViewRow> _SortRowsByColumn(IEnumerable<DataGridViewRow> rows)
         {
-            // XXX: There should be a better way to identify checkbox columns than hardcoding their indices here
-            if (this.configuration.SortByColumnIndex < 2)
+            switch (this.configuration.SortByColumnIndex)
             {
-                return Sort(rows, CheckboxSorter);
-            }
-            else if (this.configuration.SortByColumnIndex == 7)
-            {
-                return Sort(rows, DownloadSizeSorter);
+                // XXX: There should be a better way to identify checkbox columns than hardcoding their indices here
+                case 0: case 1: return Sort(rows, CheckboxSorter);
+                case 7:         return Sort(rows, DownloadSizeSorter);
+                case 8:         return Sort(rows, InstallDateSorter);
             }
             return Sort(rows, DefaultSorter);
         }
@@ -87,6 +85,17 @@ namespace CKAN
             return (row.Tag as GUIMod)?.ToCkanModule()?.download_size ?? 0;
         }
 
+        /// <summary>
+        /// Transforms a DataGridViewRow into a long representing the install date,
+        /// suitable for sorting.
+        /// The grid's default on first click is ascending, and sorting uninstalled mods to
+        /// the top is kind of useless, so we'll make this negative so ascending is useful.
+        /// </summary>
+        private long InstallDateSorter(DataGridViewRow row)
+        {
+            return -(row.Tag as GUIMod)?.InstallDate?.Ticks ?? 0;
+        }
+
         private void _UpdateFilters()
         {
             if (ModList == null) return;
@@ -139,32 +148,46 @@ namespace CKAN
 
             KspVersionCriteria versionCriteria = CurrentInstance.VersionCriteria();
             IRegistryQuerier registry = RegistryManager.Instance(CurrentInstance).registry;
-            var gui_mods = new HashSet<GUIMod>(registry.Available(versionCriteria)
-                .Select(m => new GUIMod(m, registry, versionCriteria)));
-            gui_mods.UnionWith(registry.Incompatible(versionCriteria)
-                .Select(m => new GUIMod(m, registry, versionCriteria, true)));
-            var installed = registry.InstalledModules
-                .Select(m => new GUIMod(m.Module, registry, versionCriteria));
 
-            //Hashset does not define if add/unionwith replaces existing elements.
-            //In this case that could cause a CkanModule to be replaced by a Module.
-            //Hence the explicit checking
-            foreach (var mod in installed.Where(mod => !gui_mods.Contains(mod)))
-            {
-                gui_mods.Add(mod);
-            }
-            var old_modules = new HashSet<GUIMod>(mainModList.Modules);
+            var gui_mods = new HashSet<GUIMod>();
+            gui_mods.UnionWith(
+                registry.InstalledModules
+                    .Select(instMod => new GUIMod(instMod, registry, versionCriteria))
+            );
+            gui_mods.UnionWith(
+                registry.Available(versionCriteria)
+                    .Select(m => new GUIMod(m, registry, versionCriteria))
+            );
+            gui_mods.UnionWith(
+                registry.Incompatible(versionCriteria)
+                    .Select(m => new GUIMod(m, registry, versionCriteria, true))
+            );
+
+            var old_modules = mainModList.Modules.ToDictionary(m => m, m => m.IsIncompatible);
             if (repo_updated)
             {
-                foreach (var gui_mod in gui_mods.Where(m => !old_modules.Contains(m)))
+                foreach (GUIMod gm in gui_mods)
                 {
-                    gui_mod.IsNew = true;
+                    bool oldIncompat;
+                    if (old_modules.TryGetValue(gm, out oldIncompat))
+                    {
+                        // Found it; check if newly compatible
+                        if (!gm.IsIncompatible && oldIncompat)
+                        {
+                            gm.IsNew = true;
+                        }
+                    }
+                    else
+                    {
+                        // Newly indexed, show regardless of compatibility
+                        gm.IsNew = true;
+                    }
                 }
             }
             else
             {
                 //Copy the new mod flag from the old list.
-                var old_new_mods = new HashSet<GUIMod>(old_modules.Where(m => m.IsNew));
+                var old_new_mods = new HashSet<GUIMod>(old_modules.Keys.Where(m => m.IsNew));
                 foreach (var gui_mod in gui_mods.Where(m => old_new_mods.Contains(m)))
                 {
                     gui_mod.IsNew = true;
@@ -173,7 +196,7 @@ namespace CKAN
 
             // Update our mod listing. If we're doing a repo update, then we don't refresh
             // all (in case the user has selected changes they wish to apply).
-            mainModList.ConstructModList(gui_mods.ToList(), mc, !repo_updated, configuration.HideEpochs);
+            mainModList.ConstructModList(gui_mods.ToList(), mc, !repo_updated, configuration.HideEpochs, configuration.HideV);
             mainModList.Modules = new ReadOnlyCollection<GUIMod>(
                 mainModList.full_list_of_mod_rows.Values.Select(row => row.Tag as GUIMod).ToList());
 
@@ -186,7 +209,7 @@ namespace CKAN
                 mainModList.CountModsByFilter(GUIModFilter.InstalledUpdateAvailable));
             FilterToolButton.DropDownItems[3].Text = String.Format("Cached ({0})",
                 mainModList.CountModsByFilter(GUIModFilter.Cached));
-            FilterToolButton.DropDownItems[4].Text = String.Format("New in repository ({0})",
+            FilterToolButton.DropDownItems[4].Text = String.Format("Newly compatible ({0})",
                 mainModList.CountModsByFilter(GUIModFilter.NewInRepository));
             FilterToolButton.DropDownItems[5].Text = String.Format("Not installed ({0})",
                 mainModList.CountModsByFilter(GUIModFilter.NotInstalled));
@@ -224,25 +247,16 @@ namespace CKAN
             Util.Invoke(this, () => _MarkModForUpdate(identifier));
         }
 
-
         public void _MarkModForUpdate(string identifier)
         {
-            foreach (DataGridViewRow row in ModList.Rows)
-            {
-                var mod = (GUIMod) row.Tag;
-                if (mod.Identifier == identifier)
-                {
-                    (row.Cells[1] as DataGridViewCheckBoxCell).Value = true;
-                    break;
-                }
-            }
+            DataGridViewRow row = mainModList.full_list_of_mod_rows[identifier];
+            var mod = (GUIMod)row.Tag;
+            mod.SetUpgradeChecked(row, true);
         }
 
         private void ModList_SelectedIndexChanged(object sender, EventArgs e)
         {
             var module = GetSelectedModule();
-
-            AddStatusMessage(string.Empty);
 
             ModInfoTabControl.SelectedModule = module;
             if (module == null)
@@ -428,16 +442,24 @@ namespace CKAN
     {
         protected override void OnPaint(PaintEventArgs e)
         {
-            //Hacky workaround for https://bugzilla.xamarin.com/show_bug.cgi?id=24372
-            if (Platform.IsMono && !Platform.IsMonoFour)
+            try
             {
-                var first_row_index = typeof (MainModListGUI).BaseType
-                    .GetField("first_row_index", BindingFlags.NonPublic | BindingFlags.Instance);
-                var value = (int) first_row_index.GetValue(this);
-                if (value < 0 || value >= Rows.Count)
+                // Hacky workaround for https://bugzilla.xamarin.com/show_bug.cgi?id=24372
+                if (Platform.IsMono && !Platform.IsMonoFourOrLater)
                 {
-                    first_row_index.SetValue(this, 0);
+                    var first_row_index = typeof (MainModListGUI).BaseType
+                        .GetField("first_row_index", BindingFlags.NonPublic | BindingFlags.Instance);
+                    var value = (int) first_row_index.GetValue(this);
+                    if (value < 0 || value >= Rows.Count)
+                    {
+                        first_row_index.SetValue(this, 0);
+                    }
                 }
+            }
+            catch
+            {
+                // Never throw exceptions in OnPaint, or WinForms might decide to replace our control with a big red X
+                // https://blogs.msdn.microsoft.com/shawnhar/2010/11/22/winforms-and-the-big-red-x-of-doom/
             }
             base.OnPaint(e);
         }
@@ -583,13 +605,6 @@ namespace CKAN
                 {
                     kraken = k;
                 }
-                catch (ModuleNotFoundKraken k)
-                {
-                    //We shouldn't need this. However the relationship provider will throw TMPs with incompatible mods.
-                    user.RaiseError("Module {0} has not been found. This may be because it is not compatible " +
-                                    "with the currently installed version of KSP", k.module);
-                    return null;
-                }
                 //Shouldn't get here unless there is a kraken.
                 var mod = await too_many_provides(kraken);
                 if (mod != null)
@@ -668,7 +683,7 @@ namespace CKAN
         /// <param name="modules">A list of modules that may require updating</param>
         /// <param name="refreshAll">If set to <c>true</c> then always rebuild the list from scratch</param>
         /// <param name="hideEpochs">If true, remove epochs from the displayed versions</param>
-        public IEnumerable<DataGridViewRow> ConstructModList(IEnumerable<GUIMod> modules, List<ModChange> mc = null, bool refreshAll = false, bool hideEpochs = false)
+        public IEnumerable<DataGridViewRow> ConstructModList(IEnumerable<GUIMod> modules, List<ModChange> mc = null, bool refreshAll = false, bool hideEpochs = false, bool hideV = false)
         {
 
             if (refreshAll || full_list_of_mod_rows == null)
@@ -691,45 +706,77 @@ namespace CKAN
             foreach (var mod in rowsToUpdate)
             {
                 full_list_of_mod_rows.Remove(mod.Identifier);
-                var item = new DataGridViewRow {Tag = mod};
-
-                ModChange myChange = mc?.FindLast((ModChange ch) => ch.Mod.Identifier == mod.Identifier);
-
-                var selecting = mod.IsInstallable()
-                    ? (DataGridViewCell) new DataGridViewCheckBoxCell() {
-                        Value = myChange == null ? mod.IsInstalled
-                            : myChange.ChangeType == GUIModChangeType.Install ? true
-                            : myChange.ChangeType == GUIModChangeType.Remove  ? false
-                            : mod.IsInstalled
-                    } : new DataGridViewTextBoxCell() {
-                        Value    = mod.IsAutodetected ? "AD" : "-"
-                    };
-
-                var updating = mod.IsInstallable() && mod.HasUpdate
-                    ? (DataGridViewCell) new DataGridViewCheckBoxCell() {
-                        Value = myChange == null ? false
-                            : myChange.ChangeType == GUIModChangeType.Update ? true
-                            : false
-                    } : new DataGridViewTextBoxCell() {
-                        Value    = "-"
-                    };
-
-                var name = new DataGridViewTextBoxCell {Value = mod.Name};
-                var author = new DataGridViewTextBoxCell {Value = mod.Authors};
-                var installVersion = new DataGridViewTextBoxCell {Value = hideEpochs ? ModuleInstaller.StripEpoch(mod.InstalledVersion) : mod.InstalledVersion };
-                var latestVersion = new DataGridViewTextBoxCell {Value = hideEpochs ? ModuleInstaller.StripEpoch(mod.LatestVersion) : mod.LatestVersion };
-                var desc = new DataGridViewTextBoxCell {Value = mod.Abstract};
-                var compat = new DataGridViewTextBoxCell {Value = mod.KSPCompatibility};
-                var size = new DataGridViewTextBoxCell {Value = mod.DownloadSize};
-
-                item.Cells.AddRange(selecting, updating, name, author, installVersion, latestVersion, compat, size, desc);
-
-                selecting.ReadOnly = selecting is DataGridViewTextBoxCell;
-                updating.ReadOnly = updating is  DataGridViewTextBoxCell;
-
-                full_list_of_mod_rows.Add(mod.Identifier, item);
+                full_list_of_mod_rows.Add(mod.Identifier, MakeRow(mod, mc, hideEpochs, hideV));
             }
             return full_list_of_mod_rows.Values;
+        }
+
+        private DataGridViewRow MakeRow(GUIMod mod, List<ModChange> changes, bool hideEpochs = false, bool hideV = false)
+        {
+            DataGridViewRow item = new DataGridViewRow() {Tag = mod};
+
+            ModChange myChange = changes?.FindLast((ModChange ch) => ch.Mod.Identifier == mod.Identifier);
+
+            var selecting = mod.IsInstallable()
+                ? (DataGridViewCell) new DataGridViewCheckBoxCell()
+                {
+                    Value = myChange == null ? mod.IsInstalled
+                        : myChange.ChangeType == GUIModChangeType.Install ? true
+                        : myChange.ChangeType == GUIModChangeType.Remove  ? false
+                        : mod.IsInstalled
+                }
+                : new DataGridViewTextBoxCell()
+                {
+                    Value = mod.IsAutodetected ? "AD" : "-"
+                };
+
+            var updating = mod.IsInstallable() && mod.HasUpdate
+                ? (DataGridViewCell) new DataGridViewCheckBoxCell()
+                {
+                    Value = myChange == null ? false
+                        : myChange.ChangeType == GUIModChangeType.Update ? true
+                        : false
+                }
+                : new DataGridViewTextBoxCell()
+                {
+                    Value = "-"
+                };
+
+            var name   = new DataGridViewTextBoxCell() {Value = mod.Name};
+            var author = new DataGridViewTextBoxCell() {Value = mod.Authors};
+
+            var installVersion = new DataGridViewTextBoxCell()
+            {
+                Value = hideEpochs
+                    ? (hideV
+                        ? ModuleInstaller.StripEpoch(ModuleInstaller.StripV(mod.InstalledVersion ?? ""))
+                        : ModuleInstaller.StripEpoch(mod.InstalledVersion ?? ""))
+                    : (hideV
+                        ? ModuleInstaller.StripV(mod.InstalledVersion ?? "")
+                        : mod.InstalledVersion ?? "")
+            };
+
+            var latestVersion = new DataGridViewTextBoxCell()
+            {
+                Value =
+                    hideEpochs ?
+                        (hideV ? ModuleInstaller.StripEpoch(ModuleInstaller.StripV(mod.LatestVersion))
+                        : ModuleInstaller.StripEpoch(mod.LatestVersion))
+                    : (hideV ? ModuleInstaller.StripV(mod.LatestVersion)
+                        : mod.LatestVersion)
+            };
+
+            var compat      = new DataGridViewTextBoxCell() { Value = mod.KSPCompatibility };
+            var size        = new DataGridViewTextBoxCell() { Value = mod.DownloadSize     };
+            var installDate = new DataGridViewTextBoxCell() { Value = mod.InstallDate      };
+            var desc        = new DataGridViewTextBoxCell() { Value = mod.Abstract         };
+
+            item.Cells.AddRange(selecting, updating, name, author, installVersion, latestVersion, compat, size, installDate, desc);
+
+            selecting.ReadOnly = selecting is DataGridViewTextBoxCell;
+            updating.ReadOnly  = updating  is DataGridViewTextBoxCell;
+
+            return item;
         }
 
         private bool IsNameInNameFilter(GUIMod mod)
@@ -783,7 +830,7 @@ namespace CKAN
             var options = new RelationshipResolverOptions
             {
                 without_toomanyprovides_kraken = true,
-                procede_with_inconsistencies = true,
+                proceed_with_inconsistencies = true,
                 without_enforce_consistency = true,
                 with_recommends = false
             };
